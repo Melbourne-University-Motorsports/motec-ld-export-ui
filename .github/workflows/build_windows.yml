@@ -4,6 +4,11 @@ on:
   push:
     branches: [ "feature/github-actions-workflow", "main" ]
     tags: [ "v*" ]
+    paths:
+      - 'src/**'
+      - 'motec-to-csv/**'
+      - '.github/workflows/build_windows.yml'
+      - 'requirements.txt'
   workflow_dispatch:
     inputs:
       version_tag:
@@ -19,6 +24,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
+    - name: Disable Windows Defender
+      run: |
+        Set-MpPreference -DisableRealtimeMonitoring $true
+        Set-MpPreference -DisableArchiveScanning $true
+        Set-MpPreference -DisableIOAVProtection $true
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
