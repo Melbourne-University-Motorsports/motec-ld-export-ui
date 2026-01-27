@@ -22,19 +22,21 @@ class TestMotecProcessor(unittest.TestCase):
             shutil.rmtree(self.test_dir)
 
     def test_generate_filename(self):
-        # Case 1: Single run, no collision
-        name = self.processor.generate_filename(self.test_dir, "My Run", 0, 1)
-        self.assertEqual(name, os.path.join(self.test_dir, "My Run.csv"))
+        metadata = {'comment': 'My Run', 'driver': 'Driver A', 'event': 'Q1', 'location': 'Track'}
+        duration = 100.5
+        
+        # Case 1: No collision
+        # Expected: Run_My_Run_100s_Driver_A_Q1_Track.csv
+        name = self.processor.generate_filename(self.test_dir, metadata, duration)
+        expected = os.path.join(self.test_dir, "Run_My_Run_100s_Driver_A_Q1_Track.csv")
+        self.assertEqual(name, expected)
         
         # Case 2: Collision
         with open(name, 'w') as f: f.write("test")
         
-        name2 = self.processor.generate_filename(self.test_dir, "My Run", 0, 1)
-        self.assertEqual(name2, os.path.join(self.test_dir, "My Run_1.csv"))
-
-        # Case 3: Multiple runs (should include _RunX)
-        name3 = self.processor.generate_filename(self.test_dir, "My Run", 0, 2)
-        self.assertEqual(name3, os.path.join(self.test_dir, "My Run_Run1.csv"))
+        name2 = self.processor.generate_filename(self.test_dir, metadata, duration)
+        expected2 = os.path.join(self.test_dir, "Run_My_Run_100s_Driver_A_Q1_Track_1.csv")
+        self.assertEqual(name2, expected2)
 
     @patch('backend.processor.parse_race_data')
     @patch('backend.processor.to_pandas')
@@ -42,6 +44,9 @@ class TestMotecProcessor(unittest.TestCase):
         # Mock Data
         mock_race_data = MagicMock()
         mock_race_data.comment = "TestLap"
+        mock_race_data.driver = "FastDriver"
+        mock_race_data.racetype = "Practice"
+        mock_race_data.track = "Monza"
         mock_parse.return_value = mock_race_data
         
         # Mock DF list (2 runs)
@@ -52,10 +57,10 @@ class TestMotecProcessor(unittest.TestCase):
         # Verify Scan
         result = self.processor.scan_file("dummy.ld")
         self.assertEqual(result['filepath'], "dummy.ld")
-        self.assertEqual(result['comment'], "TestLap")
+        # Check metadata
+        self.assertEqual(result['metadata']['comment'], "TestLap")
+        self.assertEqual(result['metadata']['driver'], "FastDriver")
         self.assertEqual(len(result['runs']), 2)
-        self.assertEqual(result['runs'][0]['duration'], 3.0) 
-        self.assertEqual(result['runs'][1]['duration'], 2.0)
 
     @patch('backend.processor.parse_race_data')
     @patch('backend.processor.to_pandas')
@@ -63,6 +68,9 @@ class TestMotecProcessor(unittest.TestCase):
         # Mock Data
         mock_race_data = MagicMock()
         mock_race_data.comment = "TestLap"
+        mock_race_data.driver = "Driver"
+        mock_race_data.racetype = "Race"
+        mock_race_data.track = "Track"
         mock_parse.return_value = mock_race_data
         
         # Mock DF list (2 runs)

@@ -20,6 +20,7 @@ class MainWindow(QMainWindow):
         self.scan_worker = None
         self.processor_helper = MotecProcessor()
         self.added_paths = set()
+        self.preview_seen_names = set()
 
         # Default Output Path: ./out
         self.local_path = os.path.join(os.getcwd(), 'out')
@@ -217,6 +218,7 @@ class MainWindow(QMainWindow):
         self.tree.clear()
         self.preview_list.clear()
         self.added_paths.clear()
+        self.preview_seen_names.clear()
 
     def select_output(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Directory")
@@ -243,7 +245,7 @@ class MainWindow(QMainWindow):
         
         root = QTreeWidgetItem(self.tree)
         root.setText(0, fname)
-        root.setText(2, data.get('comment', ''))
+        root.setText(2, data['metadata'].get('comment', ''))
         
         for i, r in enumerate(runs):
             child = QTreeWidgetItem(root)
@@ -254,12 +256,26 @@ class MainWindow(QMainWindow):
         self.tree.expandItem(root)
 
         # Update Preview List
-        total_runs = len(runs)
-        for i in range(total_runs):
-            fname_preview = self.processor_helper.get_output_filename(
-                data['comment'], i, total_runs
-            )
-            self.preview_list.addItem(fname_preview)
+        # Track names to handle duplicates in preview
+        for r in runs:
+            # Try to find a unique name
+            duration = r['duration']
+            metadata = data['metadata']
+            
+            # Helper generates default name (count=0)
+            candidate = self.processor_helper.get_output_filename(metadata, duration, 0)
+            
+            if candidate in self.preview_seen_names:
+                # Collision detected
+                k = 1
+                while True:
+                    candidate = self.processor_helper.get_output_filename(metadata, duration, k)
+                    if candidate not in self.preview_seen_names:
+                        break
+                    k += 1
+            
+            self.preview_seen_names.add(candidate)
+            self.preview_list.addItem(candidate)
 
     def scan_finished(self):
         self.throbber.stop()
