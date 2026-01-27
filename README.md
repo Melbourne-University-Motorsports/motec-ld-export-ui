@@ -50,6 +50,11 @@ A Python-based GUI application for converting MoTeC `.ld` data files to CSV form
    - **Export**: Click **Export CSV**. 
      - *Default Output*: Files are saved to an `./out` folder in the project directory created automatically.
      - You can change the destination by clicking "Change".
+      
+## Releasing
+
+1. **Via Git Tag**: `git tag v1.0.0` followed by `git push origin v1.0.0`.
+2. **Manual**: Go to **Actions** -> **Build Windows Exe** -> **Run workflow**.
 
 ## Project Structure
 
