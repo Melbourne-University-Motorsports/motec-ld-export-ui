@@ -48,7 +48,7 @@ class MotecProcessor:
                 
         return {
             'filepath': filepath,
-            'comment': race_data.comment,
+            'comment': self.normalize_comment(race_data),
             'runs': runs
         }
 
@@ -65,10 +65,7 @@ class MotecProcessor:
         race_data = self.load_data(filepath)
         
         # Extract comment for naming
-        comment = race_data.comment if race_data.comment else "No_Comment"
-        if not comment or comment == "No_Comment":
-             if race_data.racetype: comment = race_data.racetype
-             elif race_data.vehicle: comment = race_data.vehicle
+        comment = self.normalize_comment(race_data)
         
         dfs = self.to_dataframes(race_data)
         
@@ -92,10 +89,17 @@ class MotecProcessor:
             
         return created_files
 
-    def generate_filename(self, output_dir: str, base_name: str, run_index: int, total_runs: int) -> str:
+    def normalize_comment(self, race_data) -> str:
+        """Extracts and normalizes the comment/name from race data."""
+        comment = race_data.comment if race_data.comment else "No_Comment"
+        if not comment or comment == "No_Comment":
+             if race_data.racetype: comment = race_data.racetype
+             elif race_data.vehicle: comment = race_data.vehicle
+        return comment
+
+    def get_output_filename(self, base_name: str, run_index: int, total_runs: int) -> str:
         """
-        Generates a safe, unique filename.
-        Format: {base_name}.csv or {base_name}_Run{i}.csv
+        Generates the standard filename string without path or collision checking.
         """
         # Sanitize base_name
         import re
@@ -104,12 +108,16 @@ class MotecProcessor:
         if not safe_name:
             safe_name = "Export"
 
-        # Construct candidate name
         if total_runs > 1:
-            candidate = f"{safe_name}_Run{run_index + 1}.csv"
+            return f"{safe_name}_Run{run_index + 1}.csv"
         else:
-            candidate = f"{safe_name}.csv"
-            
+            return f"{safe_name}.csv"
+
+    def generate_filename(self, output_dir: str, base_name: str, run_index: int, total_runs: int) -> str:
+        """
+        Generates a safe, unique filename checking against disk for collisions.
+        """
+        candidate = self.get_output_filename(base_name, run_index, total_runs)  
         full_path = os.path.join(output_dir, candidate)
         
         # Handle collision
