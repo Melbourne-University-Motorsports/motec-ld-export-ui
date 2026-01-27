@@ -4,13 +4,13 @@ A Python-based GUI application for converting MoTeC `.ld` data files to CSV form
 
 ## Features
 
-- **Modern UI**: Clean interface with branded header and compact status monitoring.
-- **Bulk Export**: Drag-and-drop support for processing multiple files.
-- **Smart Naming**: Automatically names output CSVs using the "Comment" metadata from the `.ld` file. 
-    - Handles naming collisions (duplicates) by appending numeric suffixes.
-- **Auto-Splitting**: Automatically detects gaps in data (e.g. engine off or pitting) and splits a single `.ld` file into multiple "Run" CSVs.
-- **Preview**: Tree view visualization of identified splits and run durations *before* exporting.
-- **Progress Tracking**: Real-time logging and progress bar.
+- **Looks Nice**: Thumbs up for that.
+- **Bulk Export**: Drag-and-drop support for processing multiple files. It's slow tho :)
+- **Smart Naming**: An improvement to the number mess M1 tune cranks out.
+- **Auto-Splitting**: Automatically detects gaps in data (e.g. engine off or pitting) and splits a single `.ld` file into multiple "Run" CSVs. (WIP)
+- **Detailed Preview**: 
+    - **Runs**: Tree view visualization of identified splits and durations.
+    - **Filenames**: List view showing exact output filenames before export.
 
 ## Installation
 

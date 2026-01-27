@@ -48,7 +48,12 @@ class MotecProcessor:
                 
         return {
             'filepath': filepath,
-            'comment': race_data.comment,
+            'metadata': {
+                'comment': race_data.comment,
+                'driver': race_data.driver,
+                'event': race_data.racetype,
+                'location': race_data.track
+            },
             'runs': runs
         }
 
@@ -64,27 +69,23 @@ class MotecProcessor:
         """
         race_data = self.load_data(filepath)
         
-        # Extract comment for naming
-        comment = race_data.comment if race_data.comment else "No_Comment"
-        if not comment or comment == "No_Comment":
-             if race_data.racetype: comment = race_data.racetype
-             elif race_data.vehicle: comment = race_data.vehicle
+        # Metadata for naming
+        metadata = {
+            'comment': race_data.comment,
+            'driver': race_data.driver,
+            'event': race_data.racetype,
+            'location': race_data.track
+        }
         
         dfs = self.to_dataframes(race_data)
         
-        # Note: If enable_splitting is strictly False, we might want to merge or just take first? 
-        # For now we just use what library gives us (which is split). 
-        # If user wants ONE file, we effectively export all splits anyway or we'd need to concat.
-        # Given "auto-split" checkbox intent, if unchecked, maybe we should just Concatenate?
-        # But indices would have gaps. 
-        # Let's assume for now we just process valid chunks.
-
         created_files = []
         valid_dfs = [df for df in dfs if not df.empty]
         
         for i, df in enumerate(valid_dfs):
+            duration = df.index[-1] - df.index[0]
             # Name
-            out_path = self.generate_filename(output_dir, comment, i, len(valid_dfs))
+            out_path = self.generate_filename(output_dir, metadata, duration)
             
             # Export
             df.to_csv(out_path, float_format="%.3f")
@@ -92,32 +93,65 @@ class MotecProcessor:
             
         return created_files
 
-    def generate_filename(self, output_dir: str, base_name: str, run_index: int, total_runs: int) -> str:
-        """
-        Generates a safe, unique filename.
-        Format: {base_name}.csv or {base_name}_Run{i}.csv
-        """
-        # Sanitize base_name
-        import re
-        safe_name = re.sub(r'[<>:"/\\|?*]', '', base_name)
-        safe_name = safe_name.strip()
-        if not safe_name:
-            safe_name = "Export"
 
-        # Construct candidate name
-        if total_runs > 1:
-            candidate = f"{safe_name}_Run{run_index + 1}.csv"
+    def clean_text(self, text: str) -> str:
+        """Sanitizes text: replaces spaces with _, removes special chars."""
+        if not text:
+            return ""
+        import re
+        # Replace spaces with underscore
+        text = text.replace(" ", "_")
+        # Remove chars that are not alphanumeric, underscore, hyphen or period
+        text = re.sub(r'[^a-zA-Z0-9_\-\.]', '', text)
+        return text
+
+    def get_output_filename(self, metadata: dict, duration: float, collision_count: int = 0) -> str:
+        """
+        Generates filename based on metadata and duration.
+        Format: Run_{Comment}_{Duration}s_{Driver}_{Event}_{Location}[_{Count}].csv
+        """
+        parts = ["Run"]
+        
+        # Comment
+        comment = self.clean_text(metadata.get('comment', ''))
+        if comment: parts.append(comment)
+        
+        # Duration
+        parts.append(f"{int(duration)}s")
+        
+        # Driver
+        driver = self.clean_text(metadata.get('driver', ''))
+        if driver: parts.append(driver)
+        
+        # Event
+        event = self.clean_text(metadata.get('event', ''))
+        if event: parts.append(event)
+        
+        # Location
+        location = self.clean_text(metadata.get('location', ''))
+        if location: parts.append(location)
+        
+        base_name = "_".join(parts)
+        
+        if collision_count > 0:
+            return f"{base_name}_{collision_count}.csv"
         else:
-            candidate = f"{safe_name}.csv"
-            
+            return f"{base_name}.csv"
+
+    def generate_filename(self, output_dir: str, metadata: dict, duration: float) -> str:
+        """
+        Generates a safe, unique filename checking against disk for collisions.
+        Uses the collision_count param in get_output_filename.
+        """
+        candidate = self.get_output_filename(metadata, duration, 0)
         full_path = os.path.join(output_dir, candidate)
         
         # Handle collision
         counter = 1
         name_root, ext = os.path.splitext(candidate)
         while os.path.exists(full_path):
-            new_candidate = f"{name_root}_{counter}{ext}"
-            full_path = os.path.join(output_dir, new_candidate)
+            candidate = self.get_output_filename(metadata, duration, counter)
+            full_path = os.path.join(output_dir, candidate)
             counter += 1
             
         return full_path

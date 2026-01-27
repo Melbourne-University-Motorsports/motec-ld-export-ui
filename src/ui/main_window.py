@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt
 from .worker import ExportWorker, ScanWorker
 from .header import HeaderWidget
 from .throbber import PulseThrobber
+from backend.processor import MotecProcessor
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -17,7 +18,9 @@ class MainWindow(QMainWindow):
         self.resize(1000, 600)
         self.worker = None
         self.scan_worker = None
+        self.processor_helper = MotecProcessor()
         self.added_paths = set()
+        self.preview_seen_names = set()
 
         # Default Output Path: ./out
         self.local_path = os.path.join(os.getcwd(), 'out')
@@ -32,9 +35,18 @@ class MainWindow(QMainWindow):
         # 1. Header
         # Calculate updated path for image relative to this file
         # src/ui/main_window.py -> src/assets/logo.png
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        logo_path = os.path.join(base_dir, 'assets', 'logo.png')
-        throbber_path = os.path.join(base_dir, 'assets', 'throbber.png')
+        import sys
+        if getattr(sys, 'frozen', False):
+            # Running in a PyInstaller bundle
+            base_dir = sys._MEIPASS
+            # Assets were added to root 'assets' folder in the bundle
+            logo_path = os.path.join(base_dir, 'assets', 'logo.png')
+            throbber_path = os.path.join(base_dir, 'assets', 'throbber.png')
+        else:
+            # Running as source
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            logo_path = os.path.join(base_dir, 'assets', 'logo.png')
+            throbber_path = os.path.join(base_dir, 'assets', 'throbber.png')
         
         self.header = HeaderWidget(logo_path=logo_path)
         main_layout.addWidget(self.header, stretch=0)
@@ -100,11 +112,27 @@ class MainWindow(QMainWindow):
         grp_preview.setLayout(prev_layout)
         right_layout.addWidget(grp_preview)
         
+        # --- RIGHTMOST PANE: Output Files Preview ---
+        right_most_widget = QWidget()
+        right_most_layout = QVBoxLayout(right_most_widget)
+        right_most_layout.setContentsMargins(0, 0, 0, 0)
+
+        grp_preview_files = QGroupBox("Output Files")
+        preview_files_layout = QVBoxLayout()
+        
+        self.preview_list = QListWidget()
+        preview_files_layout.addWidget(self.preview_list)
+        
+        grp_preview_files.setLayout(preview_files_layout)
+        right_most_layout.addWidget(grp_preview_files)
+
         # Add widgets to splitter
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
+        splitter.addWidget(right_most_widget)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 2)
+        splitter.setStretchFactor(2, 1)
         
         content_layout.addWidget(splitter)
         
@@ -188,7 +216,9 @@ class MainWindow(QMainWindow):
     def clear_all(self):
         self.file_list.clear()
         self.tree.clear()
+        self.preview_list.clear()
         self.added_paths.clear()
+        self.preview_seen_names.clear()
 
     def select_output(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Output Directory")
@@ -215,7 +245,7 @@ class MainWindow(QMainWindow):
         
         root = QTreeWidgetItem(self.tree)
         root.setText(0, fname)
-        root.setText(2, data.get('comment', ''))
+        root.setText(2, data['metadata'].get('comment', ''))
         
         for i, r in enumerate(runs):
             child = QTreeWidgetItem(root)
@@ -224,6 +254,28 @@ class MainWindow(QMainWindow):
             child.setText(2, f"Start: {r['start']:.2f}s, End: {r['end']:.2f}s")
             
         self.tree.expandItem(root)
+
+        # Update Preview List
+        # Track names to handle duplicates in preview
+        for r in runs:
+            # Try to find a unique name
+            duration = r['duration']
+            metadata = data['metadata']
+            
+            # Helper generates default name (count=0)
+            candidate = self.processor_helper.get_output_filename(metadata, duration, 0)
+            
+            if candidate in self.preview_seen_names:
+                # Collision detected
+                k = 1
+                while True:
+                    candidate = self.processor_helper.get_output_filename(metadata, duration, k)
+                    if candidate not in self.preview_seen_names:
+                        break
+                    k += 1
+            
+            self.preview_seen_names.add(candidate)
+            self.preview_list.addItem(candidate)
 
     def scan_finished(self):
         self.throbber.stop()
