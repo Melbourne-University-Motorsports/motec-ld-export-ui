@@ -72,7 +72,7 @@ jobs:
 
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-      uses: softprop/action-gh-release@v2
+      uses: softprops/action-gh-release@v2
       with:
         files: dist/MotecExportUI.exe
         tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
