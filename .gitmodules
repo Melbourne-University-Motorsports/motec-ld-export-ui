@@ -1,0 +1,3 @@
+[submodule "motec-to-csv"]
+	path = motec-to-csv
+	url = https://github.com/Melbourne-University-Motorsports/motec-to-csv
