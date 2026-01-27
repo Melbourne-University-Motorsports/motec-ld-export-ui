@@ -4,13 +4,18 @@ import pandas as pd
 from typing import List, Tuple, Optional
 import shutil
 
-# Ensure motec-to-csv submodule is in path
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../motec-to-csv/src'))
+# Ensure motec-to-csv submodule is in path when running from source
+if not getattr(sys, 'frozen', False):
+    sys.path.append(os.path.join(os.path.dirname(__file__), '../../motec-to-csv/src'))
 
 try:
     from motec_converter import parse_race_data, to_pandas, RaceData
 except ImportError:
-    raise ImportError("Could not import 'motec_converter'. Ensure submodule is initialized.")
+    # If we are frozen, this means the build failed to include the module
+    if getattr(sys, 'frozen', False):
+         raise ImportError("Could not import 'motec_converter' in frozen application. Build configuration issue.")
+    else:
+         raise ImportError("Could not import 'motec_converter'. Ensure submodule is initialized.")
 
 class MotecProcessor:
     def __init__(self):
