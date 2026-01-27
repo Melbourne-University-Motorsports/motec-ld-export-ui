@@ -3,12 +3,16 @@ name: Build Windows Exe
 on:
   push:
     branches: [ "feature/github-actions-workflow", "main" ]
+    tags: [ "v*" ]
   workflow_dispatch:
     inputs:
       version_tag:
         description: 'Version Tag (optional, e.g. v1.0.0-beta)'
         required: false
         default: 'dev-build'
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -32,14 +36,32 @@ jobs:
         pip install ./motec-to-csv
         pip install pyinstaller
 
+    - name: Download UPX
+      run: |
+        curl -L https://github.com/upx/upx/releases/download/v4.2.2/upx-4.2.2-win64.zip -o upx.zip
+        expand-archive upx.zip -destinationpath upx
+
     - name: Build Executable
       run: |
         # Build the executable
         # --onefile: Create a single exe file
         # --noconsole: Don't show a terminal window when running
-        # --add-data: Include assets directory (src/assets -> assets in bundle)
-        # --name: Name of the output executable
-        pyinstaller --onefile --noconsole --name "MotecExportUI" --add-data "src/assets;assets" src/main.py
+        # --add-data: Include assets directory
+        # --exclude-module: Reduce size by removing unused large libraries
+        # --upx-dir: Use UPX to compress the executable
+        pyinstaller --onefile --noconsole --name "MotecExportUI" `
+          --add-data "src/assets;assets" `
+          --exclude-module PyQt6.QtWebEngine `
+          --exclude-module PyQt6.QtWebEngineCore `
+          --exclude-module PyQt6.QtSql `
+          --exclude-module PyQt6.QtMultimedia `
+          --exclude-module PyQt6.QtNetwork `
+          --exclude-module PyQt6.QtXml `
+          --exclude-module tkinter `
+          --exclude-module unittest `
+          --exclude-module pydoc `
+          --upx-dir upx/upx-4.2.2-win64 `
+          src/main.py
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -47,3 +69,14 @@ jobs:
         # Fallback to github.sha if version_tag is not provided or if inputs context is missing
         name: MotecExportUI-${{ github.event.inputs.version_tag || github.sha }}
         path: dist/MotecExportUI.exe
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+      uses: softprop/action-gh-release@v2
+      with:
+        files: dist/MotecExportUI.exe
+        tag_name: ${{ github.event.inputs.version_tag || github.ref_name }}
+        name: Release ${{ github.event.inputs.version_tag || github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
